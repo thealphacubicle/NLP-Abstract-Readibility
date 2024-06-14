@@ -1,0 +1,12 @@
+aiohttp==3.9.3
+gensim==4.3.2
+nltk==3.8.1
+numpy==1.25.2
+pandas==2.2.2
+polars==0.20.31
+textstat==0.7.3
+scikit-learn==1.2.2
+xgboost==2.0.3
+transformers==4.40.2
+tensorflow==2.10.0
+
