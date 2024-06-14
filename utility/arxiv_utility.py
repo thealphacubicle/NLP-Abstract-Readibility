@@ -1,10 +1,12 @@
-import urllib.request
+import asyncio
+import aiohttp
 import xml.etree.ElementTree as ET
 import os
 import pandas as pd
 import textstat as ts
+import urllib.parse
 
-def fetch_arxiv_data(query, start=0, max_results=10):
+async def fetch_arxiv_data(query, start=0, max_results=10):
     """
     Fetches data from ArXiv based on the given query.
 
@@ -23,8 +25,9 @@ def fetch_arxiv_data(query, start=0, max_results=10):
         'max_results': max_results
     }
     url = f"{base_url}?{urllib.parse.urlencode(query_params)}"
-    with urllib.request.urlopen(url) as response:
-        return response.read().decode('utf-8')
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.text()
 
 def parse_arxiv_data(data):
     """
@@ -54,23 +57,33 @@ def parse_arxiv_data(data):
 
     return papers
 
-def get_abstracts(query, max_results=10):
+async def get_abstracts(queries, max_results):
     """
     Retrieves the abstracts of papers from ArXiv based on the given query.
 
     Args:
-        query (str): The search query.
+        queries (str or list): List of search queries or string for a single query
         max_results (int): Maximum number of results to fetch.
 
     Returns:
         list: A list of abstracts.
+        queries (list): A list of queries matching the number of abstracts fetched.
     """
-    data = fetch_arxiv_data(query, max_results=max_results)
-    papers = parse_arxiv_data(data)
-    abstracts = [paper['summary'] for paper in papers]
+    if isinstance(queries, str):
+        queries = [queries]
 
+    abstracts = []
+    lens = {query: 0 for query in queries}
+    for query in queries:
+        data = await fetch_arxiv_data(query, max_results=max_results)
+        papers = parse_arxiv_data(data)
+        lens[query] = len(papers)
+        abstracts.extend([paper['summary'] for paper in papers])
 
-    yield from abstracts
+    # Redefine the queries list to match the number of abstracts fetched
+    queries = [query for query in queries for _ in range(lens[query])]
+
+    return queries, abstracts
 
 def get_text_scores(text):
     """
@@ -91,55 +104,28 @@ def get_text_scores(text):
         'num_sentences': len(sentences),
         'num_characters': len(characters),
         'flesch_reading_ease': ts.flesch_reading_ease(text),
-        'flesch_kincaid_grade': ts.flesch_kincaid_grade(text),
-        'smog_index': ts.smog_index(text),
-        'gunning_fog': ts.gunning_fog(text)
     }
 
-def batch_add_to_df(abstracts, query):
+def batch_add_to_df(abstracts, queries):
     """
     Adds the given data to the DataFrame.
 
     Args:
         abstracts (list): The list of abstract strings.
-        query (str): The search query.
+        queries_list (str or list): List of queries or string of singular query.
 
     Returns:
         pandas.DataFrame: The DataFrame with added data.
     """
+
+    # Check to make sure length of abstracts and queries are the same
+    assert len(abstracts) == len(queries), (("Length of abstracts and queries should be the same."
+                                            "Length of abstracts: {}, Length of queries: {}")
+                                            .format(len(abstracts), len(queries)))
+
     df_list = []
-    for i, abstract in enumerate(abstracts, 1):
+    for query, abstract in zip(queries, abstracts):
         df_list.append({'query': query, 'abstract': abstract})
         df_list[-1].update(get_text_scores(abstract))
     df = pd.DataFrame(df_list)
     return df
-
-def save_to_csv(df, filename):
-    """
-    Saves the DataFrame to a CSV file.
-
-    Args:
-        df (pandas.DataFrame): The DataFrame to be saved.
-        filename (str): The name of the CSV file.
-    """
-    # Check if the file already exists. If it does, append the new df to the existing file.
-    if os.path.exists(filename):
-        df.to_csv(filename, mode='a', header=False, index=False)
-
-    else:
-        df.to_csv(filename, index=False)
-
-
-
-# Example usage
-if __name__ == "__main__":
-    query = "machine learning"
-    abstracts = get_abstracts(query, max_results=100)
-    # for i, abstract in enumerate(abstracts, 1):
-    #     print(f"Abstract {i}:\n{abstract}\n")
-    #     print("Abstract Scores: ", get_text_scores(abstract), "\n")
-
-    df = batch_add_to_df(abstracts, query)
-    save_to_csv(df, 'arxiv_data.csv')
-
-
