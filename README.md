@@ -43,7 +43,7 @@ To load the model, follow these steps:
     import json
 
     # Load metadata
-    with open('path/to/metadata.json', 'r') as f:
+    with open('model/metadata.json', 'r') as f:
         metadata = json.load(f)
 
     model_name = metadata["model_name"]
