@@ -3,3 +3,4 @@
 *.iml
 .DS_Store
 .ipynb_checkpoints
+model/model_weights.h5
