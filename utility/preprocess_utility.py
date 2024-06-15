@@ -9,6 +9,7 @@ from gensim.models import Word2Vec
 import nltk
 nltk.download('stopwords')
 nltk.download('punkt')
+stop_words = set(stopwords.words('english'))
 
 # Preprocess class registration for polars DataFrame
 @pl.api.register_expr_namespace('text_processing')
@@ -20,9 +21,6 @@ class TextProcessing:
         """Apply the preprocess_text function."""
         return self._expr.apply(preprocess_text)
 
-# Initialize stop words
-stop_words = set(stopwords.words('english'))
-
 def preprocess_text(text):
     """Preprocess the text by converting to lowercase, tokenizing, and removing stopwords.
 
@@ -32,10 +30,10 @@ def preprocess_text(text):
     Returns:
         list: The list of preprocessed words.
     """
-    text = text.lower()
-    words = word_tokenize(text)
-    words = [word for word in words if word.isalnum() and word not in stop_words]
-    return words
+
+    # Case folding and tokenization with stop words removal
+    words = word_tokenize(text.lower())
+    return [word for word in words if word.isalnum() and word not in stop_words]
 
 def train_word2vec_model(sentences, vector_size=100, window=5, sg=1, min_count=1, epochs=10):
     """Train a Word2Vec model using the provided tokenized sentences.
@@ -64,7 +62,10 @@ def get_abstract_embedding(abstract, model):
     Returns:
         numpy.ndarray: The average embedding for the abstract.
     """
+    # Tokenize the abstract and remove stopwords
     tokenized_abstract = [word for word in word_tokenize(abstract.lower()) if word.isalnum() and word not in stop_words]
+
+    # Get the embeddings for the words in the abstract
     embeddings = [model.wv[word] for word in tokenized_abstract if word in model.wv]
     if embeddings:
         return np.mean(embeddings, axis=0)
@@ -83,6 +84,7 @@ def polars_to_pandas(df):
     pandas_df = pd.DataFrame()
     for col in df.columns:
         pandas_df[col] = df[col].to_list()
+
     return pandas_df
 
 def preprocess_dataframe(df):
@@ -107,27 +109,12 @@ def preprocess_dataframe(df):
     tokenized_sentences = result_df['processed_abstract'].to_list()
 
     # Train the Word2Vec model
-    trained_model = train_word2vec_model(tokenized_sentences)
+    model = train_word2vec_model(tokenized_sentences)
 
     # Store embeddings for each abstract
     result_df = result_df.with_columns([
-        pl.col('abstract').apply(lambda x: get_abstract_embedding(x, trained_model)).alias('embedding')
+        pl.col('abstract').apply(lambda x: get_abstract_embedding(x, model)).alias('embedding')
     ])
 
     # Convert back to Pandas DataFrame
-    final_df = polars_to_pandas(result_df)
-    return final_df
-
-# # Example usage
-# if __name__ == "__main__":
-#     # Load your training and testing DataFrames
-#     #train_df = pd.read_csv('path_to_train.csv')
-#     test_df = pd.read_csv('/Users/srihariraman/PycharmProjects/NLP Abstract Readibility/data/arxiv_test.csv')
-#
-#     # Preprocess the DataFrames
-#     #train_df_processed = preprocess_dataframe(train_df)
-#     test_df_processed = preprocess_dataframe(test_df)
-#
-#     # Save the processed DataFrames
-#     #train_df_processed.to_csv('processed_train.csv', index=False)
-#     test_df_processed.to_csv('processed_test.csv', index=False)
+    return polars_to_pandas(result_df)

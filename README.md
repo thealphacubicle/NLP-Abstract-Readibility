@@ -11,7 +11,7 @@ Predicting the readability of text is a challenging task that involves understan
 To get started, clone this repository and install the necessary dependencies:
 
 ```bash
-git clone https://github.com/yourusername/readability-prediction.git
+git clone git@github.com:thealphacubicle/NLP-Abstract-Readibility.git
 pip install -r requirements.txt
 ```
 

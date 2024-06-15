@@ -1,7 +1,5 @@
-import asyncio
 import aiohttp
 import xml.etree.ElementTree as ET
-import os
 import pandas as pd
 import textstat as ts
 import urllib.parse
@@ -39,6 +37,7 @@ def parse_arxiv_data(data):
     Returns:
         list: A list of dictionaries containing paper details.
     """
+    # XML processing code provided by ChatGPT
     root = ET.fromstring(data)
     ns = {'atom': 'http://www.w3.org/2005/Atom'}
     entries = root.findall('atom:entry', ns)
